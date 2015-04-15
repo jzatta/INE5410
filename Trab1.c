@@ -35,15 +35,24 @@ int main(int argc, char **argv) {
 	int quantDiv = VECT_SIZE / BUCKETS;
 	arrayBuckets[0].minValue = 0;
 	arrayBuckets[0].maxValue = quantDiv + (quantMod-- > 0)?1:0;
+    arrayBuckets[0].bucket = (int *)malloc(sizeof(int) * VECT_SIZE);
 	for (i = 1; i < BUCKETS; i++) {
+        arrayBuckets[i].minValue = arrayBuckets[i - 1].maxValue + 1;
+        arrayBuckets[i].maxValue = arrayBuckets[i].minValue + quantDiv + (quantMod-- > 0)?1:0;
 	}
 	
 	for (i = 0; i < VECT_SIZE; i++) {
-		int 
-	arrayBuckets->size++;
-	for (i = 0; i < VECT_SIZE; i++) {
-		
-	}
+        int j;
+		for (j = 0; j < BUCKET; j++) {
+            if ((vector[i] >= arrayBuckets[j].minValue) && (vector[i] <= arrayBuckets[j].maxValue)) {
+                arrayBuckets[j].num[arrayBuckets[j].size++] = vector[i];
+                break;
+            }
+        }
+    }
+    
+    //realloc arrayBuckets.bucket and delete empty buckets
+    
 	
 	pthread_mutex_init(&usedBucketMutex, NULL);
 	myThreads = (pthread_t *)malloc(sizeof(pthread_t) * THREADS);
@@ -51,12 +60,13 @@ int main(int argc, char **argv) {
 		pthread_init(&myThreads[i], NULL, sortIt, NULL);
 	for (i = 0; i < THREADS; i++)
 		pthread_join(myThreads[i],NULL);
-	
+	pthread_mutex_destroy(&usedBucketMutex);
+    
+    // free used memory
 }
 
 void *sortIt(void *arg) {
 	int bucketIndex;
-	bucket_t *myBucket;
 	while (true) {
 		pthread_mutex_lock(usedBucketMutex);
 		bucketIndex = usedBucket++;
@@ -64,8 +74,10 @@ void *sortIt(void *arg) {
 		if (bucketIndex >= BUCKETS) {
 			break;
 		}
-		myBucket = &arrayBuckets[bucketIndex];
-		bubbleSort(myBucket->bucket, myBucket->size);
+		else if (arrayBuckets[bucketIndex].size == 0) {
+            continue;
+        }
+		bubbleSort(arrayBuckets[bucketIndex].bucket, arrayBuckets[bucketIndex].size);
 	}
 	return NULL;
 }
