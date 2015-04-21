@@ -4,9 +4,9 @@
 #include <semaphore.h>
 #include <malloc.h>
 
-#define VECT_SIZE
-#define BUCKETS
-#define THREADS
+#define VECT_SIZE   100
+#define BUCKETS     5
+#define THREADS     10
 
 typedef struct {
     int size, minValue, maxValue;
@@ -18,7 +18,7 @@ bucket_t *arrayBuckets;
 
 pthread_mutex_t usedBucketMutex;
 
-void bubbleSort(int, int);
+void bubbleSort(int *, int);
 void *sortIt(void *);
 
 int main(int argc, char **argv) {
@@ -26,11 +26,14 @@ int main(int argc, char **argv) {
     int i, *vector;
     
     vector = (int *)malloc(sizeof(int) * VECT_SIZE);
-    arrayBuckets = (arrayBuckets *)calloc(sizeof(bucket_t), BUCKETS);
     
     srand(666);
-    for (i = 0; i < VECT_SIZE; i++) vector[i] = rand() % VECT_SIZE;
+    for (i = 0; i < VECT_SIZE; i++) {
+        vector[i] = rand() % VECT_SIZE;
+        printf("%d, ", vector[i]);
+    }
     
+    arrayBuckets = (bucket_t *)calloc(sizeof(bucket_t), BUCKETS);
     int quantMod = VECT_SIZE % BUCKETS - 1;
     int quantDiv = VECT_SIZE / BUCKETS;
     arrayBuckets[0].minValue = 0;
@@ -43,9 +46,9 @@ int main(int argc, char **argv) {
     
     for (i = 0; i < VECT_SIZE; i++) {
         int j;
-        for (j = 0; j < BUCKET; j++) {
+        for (j = 0; j < BUCKETS; j++) {
             if ((vector[i] >= arrayBuckets[j].minValue) && (vector[i] <= arrayBuckets[j].maxValue)) {
-                arrayBuckets[j].num[arrayBuckets[j].size++] = vector[i];
+                arrayBuckets[j].bucket[arrayBuckets[j].size++] = vector[i];
                 break;
             }
         }
@@ -57,20 +60,26 @@ int main(int argc, char **argv) {
     pthread_mutex_init(&usedBucketMutex, NULL);
     myThreads = (pthread_t *)malloc(sizeof(pthread_t) * THREADS);
     for (i = 0; i < THREADS; i++)	
-        pthread_init(&myThreads[i], NULL, sortIt, NULL);
-    for (i = 0; i < THREADS; i++)
+        pthread_create(&myThreads[i], NULL, sortIt, NULL);
+    for (i = 0; i < THREADS; i++) {
         pthread_join(myThreads[i],NULL);
+    }
+    free(myThreads);
     pthread_mutex_destroy(&usedBucketMutex);
     
-    // free used memory
+    for (i = 0; i < BUCKETS; i++) {
+        free(arrayBuckets[i].bucket);
+    }
+    free(arrayBuckets);
+    free(vector);
 }
 
 void *sortIt(void *arg) {
     int bucketIndex;
-    while (true) {
-        pthread_mutex_lock(usedBucketMutex);
+    while ("Todo o sempre!") {
+        pthread_mutex_lock(&usedBucketMutex);
         bucketIndex = usedBucket++;
-        pthread_mutex_unlock(usedBucketMutex);
+        pthread_mutex_unlock(&usedBucketMutex);
         if (bucketIndex >= BUCKETS) {
             break;
         }
@@ -83,12 +92,12 @@ void *sortIt(void *arg) {
 }
 
 void bubbleSort(int *buf, int size) {
-    int aux;
-    for(int i=tamanho-1; i >= 1; i--)
-        for( int j=0; j < i ; j++)
-            if(vetor[j]>vetor[j+1]) {
-                aux = vetor[j];
-                vetor[j] = vetor[j+1];
-                vetor[j+1] = aux;
+    int aux, i, j;
+    for(i=size-1; i >= 1; i--)
+        for(j=0; j < i ; j++)
+            if(buf[j]>buf[j+1]) {
+                aux = buf[j];
+                buf[j] = buf[j+1];
+                buf[j+1] = aux;
             }
 }
