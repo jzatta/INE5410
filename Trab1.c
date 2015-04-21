@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
             printf("At least one thread is required!\n");
             exit(0);
         } else if (numBuckets > vectSize) {
-            printf("Number of buckets must be smaller or equal to vector's size!");
+            printf("Number of buckets must be smaller or equal to vector's size!\n");
             exit(0);
         }
     } else {
