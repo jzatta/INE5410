@@ -5,16 +5,12 @@
 #include <malloc.h>
 #include <time.h>
 
-#define VECT_SIZE   100000
-#define BUCKETS     5
-#define THREADS     5 
-
 typedef struct {
     int size, minValue, maxValue;
     int *bucket;
 } bucket_t;
 
-int usedBucket;
+int usedBucket, numBuckets;
 bucket_t *arrayBuckets;
 
 pthread_mutex_t usedBucketMutex;
@@ -24,30 +20,46 @@ void *sortIt(void *);
 
 int main(int argc, char **argv) {
     pthread_t *myThreads;
-    int i, *vector;
+    int i, *vector, vectSize, numThreads;
 
-    vector = (int *)malloc(sizeof(int) * VECT_SIZE);
+    if (argc == 4) {
+        vectSize = atoi(argv[1]);
+        numBuckets = atoi(argv[2]);
+        numThreads = atoi(argv[3]);
+        if (numThreads < 1) {
+            printf("At least one thread is required!\n");
+            exit(0);
+        } else if (numBuckets > vectSize) {
+            printf("Number of buckets must be smaller or equal to vector's size!");
+            exit(0);
+        }
+    } else {
+        printf("Too few arguments: use $exec x y z, x = size of vector, y = number of buckets,  z = number of threads.\n");
+        exit(0);
+    }
+
+    vector = (int *)malloc(sizeof(int) * vectSize);
 
     srand(time(NULL));
-    for (i = 0; i < VECT_SIZE; i++) {
-        vector[i] = rand() % VECT_SIZE;
+    for (i = 0; i < vectSize; i++) {
+        vector[i] = rand() % vectSize;
         printf("%d ", vector[i]);
     }
     printf("\n");
 
-    arrayBuckets = (bucket_t *)calloc(sizeof(bucket_t), BUCKETS);
-    int quantMod = VECT_SIZE % BUCKETS;
-    int quantDiv = VECT_SIZE / BUCKETS;
+    arrayBuckets = (bucket_t *)calloc(sizeof(bucket_t), numBuckets);
+    int quantMod = vectSize % numBuckets;
+    int quantDiv = vectSize / numBuckets;
     arrayBuckets[0].minValue = 0;
     arrayBuckets[0].maxValue = quantDiv + ((quantMod-- > 0)?1:0) - 1;
-    for (i = 1; i < BUCKETS; i++) {
+    for (i = 1; i < numBuckets; i++) {
         arrayBuckets[i].minValue = arrayBuckets[i - 1].maxValue + 1;
         arrayBuckets[i].maxValue = arrayBuckets[i].minValue + quantDiv + ((quantMod-- > 0)?1:0) - 1;
     }
 
-    for (i = 0; i < VECT_SIZE; i++) {
+    for (i = 0; i < vectSize; i++) {
         int j;
-        for (j = 0; j < BUCKETS; j++) {
+        for (j = 0; j < numBuckets; j++) {
             if ((vector[i] >= arrayBuckets[j].minValue) && (vector[i] <= arrayBuckets[j].maxValue)) {
                 arrayBuckets[j].size++;
                 break;
@@ -55,14 +67,14 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (i = 0; i < BUCKETS; i++) {
+    for (i = 0; i < numBuckets; i++) {
         arrayBuckets[i].bucket = (int *)malloc(sizeof(int) * arrayBuckets[i].size);
         arrayBuckets[i].size = 0;
     }
 
-    for (i = 0; i < VECT_SIZE; i++) {
+    for (i = 0; i < vectSize; i++) {
         int j;
-        for (j = 0; j < BUCKETS; j++) {
+        for (j = 0; j < numBuckets; j++) {
             if ((vector[i] >= arrayBuckets[j].minValue) && (vector[i] <= arrayBuckets[j].maxValue)) {
                 arrayBuckets[j].bucket[arrayBuckets[j].size++] = vector[i];
                 break;
@@ -70,25 +82,26 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (i = 0; i < BUCKETS; i++) {
+    /*
+    for (i = 0; i < numBuckets; i++) {
         int j;
         printf("Bucket %d (min= %d, max=%d): ",i, arrayBuckets[i].minValue, arrayBuckets[i].maxValue);
         for (j = 0; j < arrayBuckets[i].size; j++)
             printf("%d ",arrayBuckets[i].bucket[j]);
         printf("\n");
     }
-    printf("\n");
+    printf("\n");*/
 
     usedBucket = 0;
     pthread_mutex_init(&usedBucketMutex, NULL);
-    myThreads = (pthread_t *)malloc(sizeof(pthread_t) * THREADS);
-    for (i = 0; i < THREADS; i++)
+    myThreads = (pthread_t *)malloc(sizeof(pthread_t) * numThreads);
+    for (i = 0; i < numThreads; i++)
         pthread_create(&myThreads[i], NULL, sortIt, (void *)i);
-    for (i = 0; i < THREADS; i++) {
+    for (i = 0; i < numThreads; i++) {
         pthread_join(myThreads[i],NULL);
     }
 
-    for (i = 0; i < BUCKETS; i++) {
+    for (i = 0; i < numBuckets; i++) {
         int j;
         for (j = 0; j < arrayBuckets[i].size; j++)
             printf("%d ",arrayBuckets[i].bucket[j]);
@@ -98,7 +111,7 @@ int main(int argc, char **argv) {
     free(myThreads);
     pthread_mutex_destroy(&usedBucketMutex);
 
-    for (i = 0; i < BUCKETS; i++) {
+    for (i = 0; i < numBuckets; i++) {
         free(arrayBuckets[i].bucket);
     }
     free(arrayBuckets);
@@ -112,7 +125,7 @@ void *sortIt(void *arg) {
         pthread_mutex_lock(&usedBucketMutex);
         bucketIndex = usedBucket++;
         pthread_mutex_unlock(&usedBucketMutex);
-        if (bucketIndex >= BUCKETS) {
+        if (bucketIndex >= numBuckets) {
             break;
         }
         else if (arrayBuckets[bucketIndex].size == 0) {
