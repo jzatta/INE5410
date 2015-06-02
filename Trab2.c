@@ -7,6 +7,8 @@
 
 #include <mpi.h>
 
+#define PRINTVECTOR 1
+
 typedef struct {
     int size, minValue, maxValue;
     int *bucket;
@@ -26,17 +28,15 @@ int main(int argc, char **argv) {
     int i, *vector, vectSize, numProcess, myRank, numBuckets;
     
     MPI_Init(&argc,&argv);
-    
+   //Pega o rank e o numero de processos 
     MPI_Comm_size(MPI_COMM_WORLD,&numProcess);
     MPI_Comm_rank(MPI_COMM_WORLD,&myRank);
-    
-//     printf("%%%d, %d%%\n\n",myRank, numProcess);
-    
+    // verificar o numero de processos
     if (numProcess < 2) {
         printf("Number of process must be grater than 1, its necessary at least one slave!\n");
         exit(0);
     }
-    
+    // se o rank for igual a 0 executa o master
     if (myRank == 0) { // execute Master
         
         if (argc == 3) {
@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
             printf("%d ", vector[i]);
         }
         printf("\n");
-        
         arrayBuckets = (bucket_t *)calloc(sizeof(bucket_t), numBuckets);
         // Define bucket range
         int quantMod = vectSize % numBuckets;
@@ -86,7 +85,7 @@ int main(int argc, char **argv) {
             arrayBuckets[i].bucket = (int *)malloc(sizeof(int) * arrayBuckets[i].size);
             arrayBuckets[i].size = 0;
         }
-        // ... elements to buckets
+        // "distribui" elements to buckets
         for (i = 0; i < vectSize; i++) {
             int j;
             for (j = 0; j < numBuckets; j++) {
@@ -96,7 +95,6 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        
         /*
          *    for (i = 0; i < numBuckets; i++) {
          *        int j;
@@ -106,46 +104,44 @@ int main(int argc, char **argv) {
          *        printf("\n");
     }
     printf("\n");*/
-        
         executeMaster(numBuckets, numProcess);
-        
+	//imprime os valores ordenados
         for (i = 0; i < numBuckets; i++) {
             int j;
             for (j = 0; j < arrayBuckets[i].size; j++)
                 printf("%d ",arrayBuckets[i].bucket[j]);
         }
         printf("\n");
-        
+	// libera memoria
         for (i = 0; i < numBuckets; i++) {
             free(arrayBuckets[i].bucket);
         }
         free(arrayBuckets);
         free(vector);
     } else { // execute slave
-        stdout = NULL;
         executeSlave();
     }
     MPI_Finalize();
 }
 
-void executeMaster(int numBuckets, int numProcess) {
-    static int usedBucket = 0;
+void executeMaster(int numBuckets, const int totalProcess) {
+    int usedBucket = 0;
+    int numProcess = totalProcess;
     int i;
-    for (i = 1; i < numProcess - 1; i++) {
+    for (i = 1; i < totalProcess; i++) {
         if (usedBucket < numBuckets) {
-            sendSlave(usedBucket,i);
+            sendSlave(usedBucket, i);
             usedBucket++;
         } else {
             terminateSlave(i);
             numProcess--;
         }
     }
-    while (numProcess < 2) {
+    while (numProcess > 1) {
         MPI_Status st;
         int ordenedBucket;
         int processWaiting;
         MPI_Recv(&ordenedBucket, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &st);
-        printf("chegou");
         processWaiting = st.MPI_SOURCE;
         receiveBucket(ordenedBucket, processWaiting);
         if (usedBucket < numBuckets) {
